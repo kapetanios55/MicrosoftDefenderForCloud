@@ -2,8 +2,16 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "workflows_RecommendationNamespaceAssignment_name": {
-            "defaultValue": "RecommendationNamespaceAssignment",
+        "PlaybookName": {
+            "defaultValue": "Playbook_Name",
+            "type": "String"
+        },
+        "TriggerFrequency": {
+            "defaultValue": 1,
+            "type": "Int"
+        },
+        "ManagementGroupId":{
+            "defaultValue": "00000000-0000-0000-0000-000000000000",
             "type": "String"
         }
     },
@@ -12,24 +20,20 @@
         {
             "type": "Microsoft.Logic/workflows",
             "apiVersion": "2017-07-01",
-            "name": "[parameters('workflows_RecommendationNamespaceAssignment_name')]",
-            "location": "uksouth",
+            "name": "[parameters('PlaybookName')]",
+            "location": "[resourceGroup().location]",
             "identity": {
                 "type": "SystemAssigned"
             },
             "properties": {
-                "state": "Disabled",
+                "state": "Enabled",
                 "definition": {
                     "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
                     "contentVersion": "1.0.0.0",
                     "parameters": {
-                        "tenantid": {
-                            "defaultValue": "00000-000000-0000000",
-                            "type": "String"
-                        },
                         "resourceMapping": {
                             "defaultValue": {
-                                "namespace1": "example@user.com",
+                                "namespace1": "user1@example.com",
                                 "namespace2": "user2@example.com",
                                 "namespace3": "user3@example.com"
                             },
@@ -43,11 +47,11 @@
                     "triggers": {
                         "Recurrence": {
                             "recurrence": {
-                                "interval": 1,
+                                "interval": "[parameters('TriggerFrequency')]",
                                 "frequency": "Day"
                             },
                             "evaluatedRecurrence": {
-                                "interval": 1,
+                                "interval": "[parameters('TriggerFrequency')]",
                                 "frequency": "Day"
                             },
                             "type": "Recurrence"
@@ -62,9 +66,9 @@
                                 "method": "POST",
                                 "body": {
                                     "managementGroups": [
-                                        "@{parameters('tenantid')}"
+                                        "[parameters('ManagementGroupId')]"
                                     ],
-                                    "query": "securityresources \n| where type == 'microsoft.security/assessments' \n| where name contains \"c5045ea3-afc6-4006-ab8f-86c8574dbf3d\"\n| extend RecommendationId = tolower(id) \n| join kind=leftouter ( securityresources \n| where type == 'microsoft.security/assessments/governanceassignments' \n| extend AssignedRecommendationId = tolower(tostring(split(id, '/governanceAssignments')[0] ))) on $left.RecommendationId == $right.AssignedRecommendationId \n| extend AzureResourceId1 = tolower(tostring(parse_json(properties.resourceDetails.ResourceId))) \n| where isempty(AssignedRecommendationId) \n| extend Status = tostring(parse_json(properties.status.code)) \n| extend resourceId = tostring(parse_json(properties.resourceDetails.ResourceId)) \n| where Status contains 'unhealthy' \n|extend securityentity = extract(@\"securityentitydata\\/(.+)\", 1, resourceId)\n| project id, Status, subscriptionId, resourceId, AssessmentId=name, AssignedRecommendationId, securityentity"
+                                    "query": "securityresources \n| where type == 'microsoft.security/assessments' \n| where name contains \"c5045ea3-afc6-4006-ab8f-86c8574dbf3d\"\n| extend RecommendationId = tolower(id) \n| join kind=leftouter ( securityresources \n| where type == 'microsoft.security/assessments/governanceassignments' \n| extend AssignedRecommendationId = tolower(tostring(split(id, '/governanceAssignments')[0] ))) on $left.RecommendationId == $right.AssignedRecommendationId \n| extend AzureResourceId1 = tolower(tostring(parse_json(properties.resourceDetails.ResourceId))) \n| where isempty(AssignedRecommendationId) \n| extend Status = tostring(parse_json(properties.status.code)) \n| extend resourceId = tostring(parse_json(properties.resourceDetails.ResourceId)) \n| where Status contains 'unhealthy' \n| extend securityentity = extract(@\"securityentitydata/(.+)\", 1, resourceId)\n| extend clusterPath = extract(@\"(/subscriptions/[^/]+/resourcegroups/[^/]+/providers/microsoft.containerservice/managedclusters/[^/]+)\", 1, resourceId)\n| join kind= inner (resources\n| where type contains \"microsoft.containerservice/managedclusters\"\n| extend LowerValue= tolower(id)\n| distinct LowerValue) on $left.clusterPath == $right.LowerValue\n| project id, Status, subscriptionId, resourceId, AssessmentId=name, AssignedRecommendationId, securityentity, clusterPath"
                                 },
                                 "authentication": {
                                     "type": "ManagedServiceIdentity",
@@ -192,8 +196,7 @@
                                     },
                                     "runAfter": {
                                         "Set_variable": [
-                                            "Succeeded",
-                                            "Failed"
+                                            "Succeeded"
                                         ]
                                     },
                                     "else": {
