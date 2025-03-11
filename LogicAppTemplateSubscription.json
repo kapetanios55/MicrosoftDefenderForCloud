@@ -1,0 +1,277 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "PlaybookName": {
+            "defaultValue": "Playbook_Name",
+            "type": "String"
+        },
+        "TriggerFrequency": {
+            "defaultValue": 1,
+            "type": "Int"
+        },
+        "SubscriptionId":{
+            "defaultValue": "00000000-0000-0000-0000-000000000000",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('PlaybookName')]",
+            "location": "[resourceGroup().location]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "resourceMapping": {
+                            "defaultValue": {
+                                "namespace1": "user1@example.com",
+                                "namespace2": "user2@example.com",
+                                "namespace3": "user3@example.com"
+                            },
+                            "type": "Object"
+                        },
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "interval": "[parameters('TriggerFrequency')]",
+                                "frequency": "Day"
+                            },
+                            "evaluatedRecurrence": {
+                                "interval": "[parameters('TriggerFrequency')]",
+                                "frequency": "Day"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "HTTP": {
+                            "runAfter": {},
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "https://management.azure.com/providers/Microsoft.ResourceGraph/resources?api-version=2022-10-01",
+                                "method": "POST",
+                                "body": {
+                                    "managementGroups": [
+                                        "[parameters('SubscriptionId')]"
+                                    ],
+                                    "query": "securityresources \n| where type == 'microsoft.security/assessments' \n| where name contains \"c5045ea3-afc6-4006-ab8f-86c8574dbf3d\"\n| extend RecommendationId = tolower(id) \n| join kind=leftouter ( securityresources \n| where type == 'microsoft.security/assessments/governanceassignments' \n| extend AssignedRecommendationId = tolower(tostring(split(id, '/governanceAssignments')[0] ))) on $left.RecommendationId == $right.AssignedRecommendationId \n| extend AzureResourceId1 = tolower(tostring(parse_json(properties.resourceDetails.ResourceId))) \n| where isempty(AssignedRecommendationId) \n| extend Status = tostring(parse_json(properties.status.code)) \n| extend resourceId = tostring(parse_json(properties.resourceDetails.ResourceId)) \n| where Status contains 'unhealthy' \n| extend securityentity = extract(@\"securityentitydata/(.+)\", 1, resourceId)\n| extend clusterPath = extract(@\"(/subscriptions/[^/]+/resourcegroups/[^/]+/providers/microsoft.containerservice/managedclusters/[^/]+)\", 1, resourceId)\n| join kind= inner (resources\n| where type contains \"microsoft.containerservice/managedclusters\"\n| extend LowerValue= tolower(id)\n| distinct LowerValue) on $left.clusterPath == $right.LowerValue\n| project id, Status, subscriptionId, resourceId, AssessmentId=name, AssignedRecommendationId, securityentity, clusterPath"
+                                },
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "audience": "https://management.azure.com"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "Parse_JSON": {
+                            "runAfter": {
+                                "Initialize_variable_1": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ParseJson",
+                            "inputs": {
+                                "content": "@body('HTTP')",
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "totalRecords": {
+                                            "type": "integer"
+                                        },
+                                        "count": {
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "Status": {
+                                                        "type": "string"
+                                                    },
+                                                    "subscriptionId": {
+                                                        "type": "string"
+                                                    },
+                                                    "resourceId": {
+                                                        "type": "string"
+                                                    },
+                                                    "AssessmentId": {
+                                                        "type": "string"
+                                                    },
+                                                    "AssignedRecommendationId": {
+                                                        "type": "string"
+                                                    },
+                                                    "securityentity": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "Status",
+                                                    "subscriptionId",
+                                                    "resourceId",
+                                                    "AssessmentId",
+                                                    "AssignedRecommendationId",
+                                                    "securityentity"
+                                                ]
+                                            }
+                                        },
+                                        "facets": {
+                                            "type": "array"
+                                        },
+                                        "resultTruncated": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "For_each": {
+                            "foreach": "@body('Parse_JSON')?['data']",
+                            "actions": {
+                                "Set_variable": {
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "UserOwner",
+                                        "value": "@variables('NamespaceMapping')[item()?['securityentity']]"
+                                    }
+                                },
+                                "Condition": {
+                                    "actions": {
+                                        "HTTP_1": {
+                                            "type": "Http",
+                                            "inputs": {
+                                                "uri": "https://management.azure.com@{item()?['resourceId']}/providers/Microsoft.Security/assessments/@{item()?['AssessmentId']}/governanceAssignments/@{guid()}?api-version=2021-06-01",
+                                                "method": "PUT",
+                                                "body": {
+                                                    "id": "@{item()?['resourceId']}",
+                                                    "name": "@{item()?['AssessmentId']}",
+                                                    "type": "Microsoft.Security/governanceAssignments",
+                                                    "properties": {
+                                                        "owner": "@{variables('UserOwner')}",
+                                                        "remediationDueDate": "@{formatDateTime(addDays(utcNow(), 14), 'yyyy-MM-ddTHH:mm:ss.0000000Z')}",
+                                                        "remediationEta": {
+                                                            "eta": "@{formatDateTime(addDays(utcNow(), 14), 'yyyy-MM-ddTHH:mm:ss.0000000Z')}",
+                                                            "justification": "Justification of ETA"
+                                                        },
+                                                        "isGracePeriod": true,
+                                                        "governanceEmailNotification": {
+                                                            "disableManagerEmailNotification": true,
+                                                            "disableOwnerEmailNotification": true
+                                                        }
+                                                    }
+                                                },
+                                                "authentication": {
+                                                    "type": "ManagedServiceIdentity",
+                                                    "audience": "https://management.azure.com"
+                                                }
+                                            },
+                                            "runtimeConfiguration": {
+                                                "contentTransfer": {
+                                                    "transferMode": "Chunked"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Set_variable": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "else": {
+                                        "actions": {}
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "not": {
+                                                    "equals": [
+                                                        "@variables('UserOwner')",
+                                                        "@null"
+                                                    ]
+                                                }
+                                            },
+                                            {
+                                                "equals": [
+                                                    "",
+                                                    ""
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                }
+                            },
+                            "runAfter": {
+                                "Parse_JSON": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "Initialize_variable": {
+                            "runAfter": {
+                                "HTTP": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "NamespaceMapping",
+                                        "type": "object",
+                                        "value": "@parameters('resourceMapping')"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_1": {
+                            "runAfter": {
+                                "Initialize_variable": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "UserOwner",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {}
+                    }
+                }
+            }
+        }
+    ]
+}
