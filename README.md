@@ -75,3 +75,15 @@ az role assignment create --assignee "<ManagedIdentityID>" --role "Reader" --sco
 az role assignment create --assignee "<ManagedIdentityID>" --role "Security Admin" --scope "/subscriptions/<SubscriptionID>"
 az role assignment create --assignee "<ManagedIdentityID>" --role "Reader" --scope "/subscriptions/<SubscriptionID>"
 ```
+### **Applying on Multiple subscriptions**
+If you want your logic app to run on multiple subscriptions you can do that by changing the HTTP compoment API call body:
+```json
+{
+  "subscriptions": [
+    "<subscription1ID>",
+    "<subscription2ID>"
+  ],
+  "query": "<query>"
+}
+
+Make sure to assign the needed permissions on all subscriptions refferenced in the HTTP component
