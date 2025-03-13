@@ -48,11 +48,29 @@ You can customize **namespace-to-owner mappings** in two ways:
        }
    }
 
+3. Modify the namespace-to-owner mappings.
+4. Deploy using the Deploy to Azure button.
 
+### **⚡ After Deployment (via Azure UI)**
+If you need to update the namespace-to-owner mapping after the Logic App is deployed, follow these steps:
 
+1. Open the **deployed Logic App** in **Azure Portal**.
+2. Navigate to **Parameters** under the Logic App settings.
+3. Locate the **resourceMapping** parameter and update the values as needed.
+4. Click **Save** to apply the changes.
 
+---
 
+## 🔐 Assigning Permissions to the Logic App
+For the Logic App to successfully execute governance assignments, its **Managed Identity** must have the appropriate **Security Admin** permissions.
 
+### **🔹 Using PowerShell**
+```powershell
+//Management Group
+az role assignment create --assignee "<ManageIdentityID>" --role "Security Admin" --scope "/providers/Microsoft.Management/managementGroups/<MGID>"
+//Subscription
+az role assignment create --assignee "<ManagedIdentityID>" --role "Security Admin" --scope "/subscriptions/<SubscriptionID>"
+```
 
 Management Group Logic-App deployment
 
