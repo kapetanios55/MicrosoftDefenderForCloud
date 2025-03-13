@@ -63,12 +63,15 @@ If you need to update the namespace-to-owner mapping after the Logic App is depl
 ---
 
 ## 🔐 Assigning Permissions to the Logic App
-For the Logic App to successfully execute governance assignments, its **Managed Identity** must have the appropriate **Security Admin** permissions.
+For the Logic App to successfully execute governance assignments, its **Managed Identity** must have the appropriate **Security Admin** and **Reader** permissions.
 
 ### **🔹 Using PowerShell**
 ```powershell
 //Management Group
 az role assignment create --assignee "<ManageIdentityID>" --role "Security Admin" --scope "/providers/Microsoft.Management/managementGroups/<MGID>"
+az role assignment create --assignee "<ManagedIdentityID>" --role "Reader" --scope "/providers/Microsoft.Management/managementGroups/<MGID>"
+
 //Subscription
 az role assignment create --assignee "<ManagedIdentityID>" --role "Security Admin" --scope "/subscriptions/<SubscriptionID>"
+az role assignment create --assignee "<ManagedIdentityID>" --role "Reader" --scope "/subscriptions/<SubscriptionID>"
 ```
