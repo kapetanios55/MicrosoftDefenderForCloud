@@ -85,5 +85,5 @@ If you want your logic app to run on multiple subscriptions you can do that by c
   ],
   "query": "<query>"
 }
-
+````
 Make sure to assign the needed permissions on all subscriptions refferenced in the HTTP component
