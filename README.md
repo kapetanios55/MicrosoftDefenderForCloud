@@ -9,6 +9,7 @@
 This repository provides **automated governance assignments** for **Microsoft Defender for Cloud** using **Azure Logic Apps**. It helps organizations enforce security policies **at scale** by applying governance rules to namespaces across **subscriptions** or **management groups**.
 
 By deploying the provided **Logic Apps**, you can:
+
 ✔ Automate **namespace governance assignments**.  
 ✔ Enforce **security policies** dynamically.  
 ✔ Monitor **compliance and ownership** efficiently.  
@@ -71,11 +72,3 @@ az role assignment create --assignee "<ManageIdentityID>" --role "Security Admin
 //Subscription
 az role assignment create --assignee "<ManagedIdentityID>" --role "Security Admin" --scope "/subscriptions/<SubscriptionID>"
 ```
-
-Management Group Logic-App deployment
-
-[![Deploy To Azure](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/deploytoazure.svg?sanitize=true)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FKapetanios55%2FMicrosoftDefenderforCloud%2Fmain%2FLogicAppTemplateManagementGroup.json)
-
-Subscription Logic-App deployment
-
-[![Deploy To Azure](https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/1-CONTRIBUTION-GUIDE/images/deploytoazure.svg?sanitize=true)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FKapetanios55%2FMicrosoftDefenderforCloud%2Fmain%2FLogicAppTemplateSubscription.json)
